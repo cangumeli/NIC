@@ -1,3 +1,5 @@
+"Module contains the encoder CNN model"
+module Encoder
 using Knet
 
 @knet function vgg_generic_conv(x; cinput=0, coutput=0)

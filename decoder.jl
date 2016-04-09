@@ -1,3 +1,5 @@
+"Module that contains decoder lstm model"
+module Decoder
 using Knet
 
 @knet function embedder(x; output=512)
