@@ -31,7 +31,7 @@ end
 @knet function vgg16(xl0; output=512)
     #Convolutional layers
     xl1 = layer_2conv(xl0; output=64)    
-    xl2_ = layer_2conv(xl1; output=128)    
+    xl2 = layer_2conv(xl1; output=128)
     xl3 = layer_3conv(xl2; output=256)    
     xl4 = layer_3conv(xl3; output=512)    
     xl5 = layer_3conv(xl4; output=512)
