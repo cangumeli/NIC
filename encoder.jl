@@ -1,5 +1,6 @@
-"Module contains the encoder CNN model"
-module Encoder
+#"Module contains the encoder CNN model"
+#module Encoder
+
 using Knet
 
 @knet function vgg_generic_conv(x; cinput=0, coutput=0)
@@ -39,6 +40,6 @@ end
     #Fully Connected layers
     xl6 = layer_fcdrop(xl5)
     xl7 = layer_fcdrop(xl6)
-    
-    return wbf(xl7; f=:soft, out=output)
+    return xl7
+   # return wbf(xl7; f=:soft, out=output)
 end
