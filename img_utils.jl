@@ -10,6 +10,12 @@ function img2vec(img)
     return I
 end
 
+#Apply mean subtraction to the image
+function mean_subtract(img)
+    return img .- mean(img,3)
+end
+
+
 #some dummy Knet models for testing image processing functions
 #using Knet
 #@knet function conv_test(x)
