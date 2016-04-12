@@ -40,6 +40,9 @@ end
     #Fully Connected layers
     xl6 = layer_fcdrop(xl5)
     xl7 = layer_fcdrop(xl6)
-    return xl7
-   # return wbf(xl7; f=:soft, out=output)
+
+    #Embedding layer for image representation
+    return wdot(xl7; out=output)
+
+    # return wbf(xl7; f=:soft, out=output)
 end
