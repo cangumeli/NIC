@@ -11,30 +11,36 @@ function image_names(filename; erase_newline=true, make_set=false)
 end
 
 #Takes the filename and returns each line in it
-function get_captions(img_names, filename)
+#works with flickr8k
+function get_captions(img_names, filename; get_id=false, lower=true, erase_newline=true)
     f = open(filename)
     captions = Any[]
     for l in eachline(f)
-        img_name = split(l, "#")[1]
+        imgvsrest = split(l, "#")
+        img_name = imgvsrest[1]
+        idvscapt = split(imgvsrest[2], "\t")
+        id, caption = idvscapt[1], string("<sw> ", idvscapt[2][1:length(idvscapt[2])-erase_newline], " <ew>")
+        if lower; caption = lowercase(caption); end
         if img_name in img_names
-            push!(captions, l)
+            push!(captions, get_id ? (img_name, id, caption) : (img_name, caption))
         end
     end
     close(f)
     return captions
 end
 
-function create_dict(captions; c2t=(a)->split(a, "\t")[2], min_freq=5)
+
+function create_dict(caption_texts; min_freq=5)
     dict = Dict()
     #start and end words
-    dict["<sw>"] = (1, Inf)
-    dict["<ew>"] = (2, Inf)
+    #dict["<sw>"] = (1, Inf)
+    #dict["<ew>"] = (2, Inf)
     
-    caption_texts = map(c2t, captions)
-    largest_index = 2 #Largest accepted word index
+    #caption_texts = map(c2t, captions)
+    largest_index = 0 #Largest accepted word index
     
     for t in caption_texts
-        words = map((s)->lowercase(s), split(t))
+        words = split(t)
         for w in words
             if haskey(dict, w)
                 (index, freq) = dict[w]
@@ -56,19 +62,45 @@ function create_dict(captions; c2t=(a)->split(a, "\t")[2], min_freq=5)
         else
             dict[w] = dict[w][1]
         end
-    end
-            
+    end            
     return dict
 end
 
 
 function word2onehot(word, dict)
     vect = Array(1:length(dict))
-    return vect .== dict[word]
+    return 1.0 .* (vect .== dict[word])
 end
 
-#retuns a tupple of the form ((data, caption), epoch)
-#requires batchsize | # of captions
+#Returns the largest possible caption in the dataset
+function largest_caption(caption_texts, dict)
+    largest_cap = 2
+    for c in caption_texts
+        w = filter((a)->a in keys(dict), split(c))
+        largest_cap = max(length(w), largest_cap)
+    end
+    return largest_cap
+end
+
+
+#Load the image file and corresponding captions as a vector,
+#applies mean subtraction while loading as it is a standard preprocession operation by default
+#but this can be changed with mean_sub parameter
+function img_caption_pair(img_dst, caption, dict; max_caption=37, mean_sub=true)
+    img = mean_sub ? mean_subtract(img2vec(load(img_dst))) : img2vec(load(img_dst))
+    cap = zeros(length(dict), max_caption)
+    #end and start words
+    #cap[:, 1] = word2onehot("<sw>", dict)
+    #cap[:, max_caption] = word2onehot("<ew>", dict)
+    
+    words = filter((w)->haskey(dict, w), split(caption))
+    for i = 1:max_caption
+        cap[:,i] = word2onehot(i<=length(words)?words[i]:"<ew>", dict)
+    end
+    return img, cap
+end
+
+
 function minibatcher(batch_size, captions, img_base_dir; shuffle=true, num_epochs=5, crop=(a)->a)
     start_index=1
     end_index=batch_size
