@@ -83,28 +83,40 @@ function largest_caption(caption_texts, dict)
 end
 
 
-#Load the image file and corresponding captions as a vector,
+#Load the image files and corresponding caption texts as a vector,
 #applies mean subtraction while loading as it is a standard preprocession operation by default
 #but this can be changed with mean_sub parameter
-function img_caption_pair(img_dst, caption, dict; max_caption=37, mean_sub=true)
-    img = mean_sub ? mean_subtract(img2vec(load(img_dst))) : img2vec(load(img_dst))
-    cap = zeros(length(dict), max_caption)
-    #end and start words
-    #cap[:, 1] = word2onehot("<sw>", dict)
-    #cap[:, max_caption] = word2onehot("<ew>", dict)
+#Requires img_dists and caption_texts to be same size
+function img_caption_pairs(img_dsts, caption_texts, dict; max_caption=39, mean_sub=true)
+    batch_size = length(caption_texts)
     
-    words = filter((w)->haskey(dict, w), split(caption))
-    for i = 1:max_caption
-        cap[:,i] = word2onehot(i<=length(words)?words[i]:"<ew>", dict)
+    #load the images
+    imgs = zeros(224, 224, 3, batch_size)
+    for i = 1:batch_size
+        imgs[:, :, :, i] = mean_sub ? mean_subtract(img2vec(load(img_dsts[b]))) : img2vec(load(img_dsts[b]))
     end
-    return img, cap
+
+    #load the captions
+    caps = zeros(length(dict), max_caption, batch_size)
+    for b = 1:batch_size
+        words = filter((w)->haskey(dict, w), split(caption_texts[b]))
+        for i = 1:max_caption
+            wi = (i <= length(words)) ? dict[words[i]] : dict["<ew>"]
+            caps[wi, i, b] = 1.0  
+        end
+    end
+    
+    return imgs, caps
 end
 
 
-function minibatcher(batch_size, captions, img_base_dir; shuffle=true, num_epochs=5, crop=(a)->a)
+function minibatcher(batch_size; training_images_file = "~/NIC/Flickr8k/text/Flickr_8k.trainImages.txt",
+                     captions_file="~/NIC/Flickr8k/Flickr8k.token.txt", img_base_dir="~/NIC/Flickr8k/Flicker8k_Dataset_Prep224/",
+                     shuffle=true, num_epochs=5, crop=(a)->a)
     start_index=1
     end_index=batch_size
-    epochs = 1
+    epoch = 1
+    
     function next_batch()
         #old_start, old_end = start_index, end_index
         start_index = start_index + batch_size
@@ -117,12 +129,13 @@ function minibatcher(batch_size, captions, img_base_dir; shuffle=true, num_epoch
         end
         current_caps = captions[start_index:end_index]
         filenames = map((s) -> split(s, "#")[1], current_caps)
+        
         #Populate target image data and labels
-        ygold = map((s) -> split(s, "\t")[2], current_caps)
-        image_batch = zeros(224, 224, 3, batch_size)
-        for i = 1:length(filenames)
-            image_batch[:, :, :, i] = crop(img2vec(load(string(img_base_dir, filenames[i]))))
-        end
+        #ygold = map((s) -> split(s, "\t")[2], current_caps)
+        #image_batch = zeros(224, 224, 3, batch_size)
+        #for i = 1:length(filenames)
+        #    image_batch[:, :, :, i] = crop(img2vec(load(string(img_base_dir, filenames[i]))))
+        #end
         return image_batch, ygold
         #return old_start, old_end        
     end
