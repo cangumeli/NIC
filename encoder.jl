@@ -7,7 +7,8 @@ using Knet
     w = par(init=Xavier(), dims=(3, 3, cinput, coutput))
     b = par(init=Constant(0), dims=(1,1,coutput,1))
     c = conv(w, x; padding=1)
-    return relu(c)
+    cb = c + b
+    return relu(cb)
 end
 
 @knet function layer_2conv(x0; output=64)
@@ -31,7 +32,7 @@ end
 
 @knet function vgg16(xl0; output=512)
     #Convolutional layers
-    xl1 = layer_2conv(xl0; output=64)    
+    xl1 = layer_2conv(xl0; output=64) 
     xl2 = layer_2conv(xl1; output=128)
     xl3 = layer_3conv(xl2; output=256)    
     xl4 = layer_3conv(xl3; output=512)    
