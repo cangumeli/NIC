@@ -10,7 +10,7 @@ function img2vec(img; crop=true, crop_target=224, rescale = false, minmin_scale=
     end
     flip && rand(1:2)==1 && flipdim(img, 1)
     r = convert(Array{Float16, 3}, raw(img'))
-    I = zeros(size(r)[2], size(r)[3], 3, 1)
+    I = zeros(Float16, size(r)[2], size(r)[3], 3, 1)
     I[:,:,1,1] = r[1,:,:]
     I[:,:,2,1] = r[2,:,:]
     I[:,:,3,1] = r[3,:,:]
