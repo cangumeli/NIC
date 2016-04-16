@@ -8,7 +8,7 @@ function img2vec(img; crop=true, crop_target=224, rescale = false, minmin_scale=
         y_start = rand(1:size(img,2)-crop_target+1)
         img = subim(img, "x", x_start:x_start+crop_target-1, "y", y_start:y_start+crop_target-1)
     end
-    flip && rand(1:2)==1 && flipdim(img, 1)
+    flip && rand(1:20)==1 && flipdim(img, 1)
     r = convert(Array{Float16, 3}, raw(img'))
     I = zeros(Float16, size(r)[2], size(r)[3], 3, 1)
     I[:,:,1,1] = r[1,:,:]
