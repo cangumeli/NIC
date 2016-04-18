@@ -16,19 +16,25 @@ end
 end
 
 
-@knet function lstm_nic(x; mem_size=512, dict_size=0)    
+@knet function lstm_nic(x; mem_size=512, dict_size=0)
+    #if no_embed #independent embedding
+    #    emb = x
+    #else
+    #    emb = embedder(x)
+    #end
     i = wf2(x, m; output=mem_size)
     f = wf2(x, m; output=mem_size)
     o = wf2(x, m; output=mem_size)
     h = wf2(x, m; f=:tanh, output=mem_size)
     c = f .* c + i .* h
     m = o .* c
-    if seq
+    if first
+        return m
+    else        
         p = generator(m; dict_size=dict_size)
         return p
-    else
-        return m
     end
+        
 end
 
 

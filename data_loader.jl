@@ -12,23 +12,27 @@ end
 
 #Takes the filename and returns each line in it
 #works with flickr8k
-function get_captions(img_names, filename; get_id=false, lower=true, erase_newline=true)
+function get_captions(img_names, filename; get_id=false, lower=true, erase_newline=true, base_dir="", cap_cnt=nothing)
     f = open(filename)
     captions = Any[]
+    cap_cnts = (cap_cnt == nothing) ? nothing :  Dict()
     for l in eachline(f)
         imgvsrest = split(l, "#")
-        img_name = imgvsrest[1]
+        img_name = string(base_dir, imgvsrest[1])
         idvscapt = split(imgvsrest[2], "\t")
         id, caption = idvscapt[1], string("<sw> ", idvscapt[2][1:length(idvscapt[2])-erase_newline], " <ew>")
         if lower; caption = lowercase(caption); end
-        if img_name in img_names
+        if last(split(img_name, "/")) in img_names && (cap_cnts == nothing || !haskey(cap_cnts, img_name) || cap_cnts[img_name] < cap_cnt)
             push!(captions, get_id ? (img_name, id, caption) : (img_name, caption))
+            (cap_cnts != nothing) & (cap_cnts[img_name] = haskey(cap_cnts, img_name) ? cap_cnts[img_name]+1 : 1)
         end
     end
     close(f)
     return captions
 end
 
+caption_texts(captions; get_id=false) = map((c)->c[2+get_id], captions)
+caption_image_names(captions) = map((c)->c[1], captions)
 
 function create_dict(caption_texts; min_freq=5)
     dict = Dict()
@@ -66,10 +70,21 @@ function create_dict(caption_texts; min_freq=5)
     return dict
 end
 
+function dictasarray(dict)
+    dict_array = zeros(length(dict), 1)
+    for k in keys(dict)
+        dict_array[dict[k]] = k
+    end
+    return dict_array
+end
 
-function word2onehot(word, dict)
-    vect = Array(1:length(dict))
-    return 1.0 .* (vect .== dict[word])
+function word2onehot(words, dict)
+    ohv = zeros(Float32, length(dict), length(words))
+    for i = 1:lentgh(words)
+        ohv[dict[words[i]], i] = 1.0
+    end    
+    #vect = Array(1:length(dict))
+    return ohv
 end
 
 #Returns the largest possible caption in the dataset
@@ -87,29 +102,41 @@ end
 #applies mean subtraction while loading as it is a standard preprocession operation by default
 #but this can be changed with mean_sub parameter
 #Requires img_dists and caption_texts to be same size
-function img_caption_pairs(img_dsts, caption_texts, dict; max_caption=39, mean_sub=true)
+function img_seq_pairs(img_dsts, caption_texts, dict; max_caption=39, mean_sub=true, img_cache=nothing)
     batch_size = length(caption_texts)
     
     #load the images
-    imgs = zeros(224, 224, 3, batch_size)
+    imgs = zeros(Float32, 224, 224, 3, batch_size)
     for i = 1:batch_size
-        imgs[:, :, :, i] = mean_sub ? mean_subtract(img2vec(load(img_dsts[b]))) : img2vec(load(img_dsts[b]))
+        if img_cache != nothing && haskey(img_cache, img_dsts[i])
+            imgs[:, :, :, i] = img_cache[img_dsts[i]]
+        else
+            imgs[:, :, :, i] = mean_sub ? mean_subtract(img2vec(load(img_dsts[i]))) : img2vec(load(img_dsts[i]))
+            
+            if img_cache != nothing
+                img_cache[img_dsts[i]] = img
+            end
+        end                
     end
-
+    
     #load the captions
-    caps = zeros(length(dict), max_caption, batch_size)
+    caps = zeros(Float32, length(dict), max_caption, batch_size)
+    masks = ones(UInt8, batch_size, max_caption)
     for b = 1:batch_size
         words = filter((w)->haskey(dict, w), split(caption_texts[b]))
         for i = 1:max_caption
-            wi = (i <= length(words)) ? dict[words[i]] : dict["<ew>"]
-            caps[wi, i, b] = 1.0  
+            masks[b, i] = i <= length(words)
+            wi = (masks[b,i] == 1) ? dict[words[i]] : dict["<ew>"]
+            caps[wi, i, b] = 1.0
         end
     end
     
-    return imgs, caps
+    return imgs, caps, masks
 end
 
 
+
+#UNUSED
 function minibatcher(batch_size; training_images_file = "~/NIC/Flickr8k/text/Flickr_8k.trainImages.txt",
                      captions_file="~/NIC/Flickr8k/Flickr8k.token.txt", img_base_dir="~/NIC/Flickr8k/Flicker8k_Dataset_Prep224/",
                      shuffle=true, num_epochs=5, crop=(a)->a)
