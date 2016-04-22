@@ -43,7 +43,23 @@ end
     return drop(x1; pdrop=0.5)
 end
 
+#@knet function layer_fconv(x0; winits=ws, binits=bs, start_index=1)
+    #x1 = cbfp(x0; cinit=ws[start_index], binit=bs[start_index], f=:relu)
+#    x1 = wconv(x0; cinit=winits[start_index])
+#    x2 = bias(x1; binit=binits[start_index])
+#    return drop(x1; pdrop=0.5)
+#end
 
+@knet function layer_fconv(x; winit=ws,binit=bs, start_index=14)
+    w = par(init=winit[start_index], dims=size(ws[start_index]))
+    b = par(init=binit[start_index], dims=size(bs[start_index]))
+    
+    x1 = conv(w, x)
+    x2 = x1 + b
+    return x2
+end
+
+              
 @knet function vgg16(xl0)
     #Convolutional layers
     xl1 = layer_2conv(xl0;  start_index=1) 
@@ -52,20 +68,35 @@ end
     xl4 = layer_3conv(xl3;  start_index=8)
     xl5 = layer_3conv(xl4;  start_index=11)
 
+    #return xl5
     #Fully Connected layers
-    xl6 = layer_fcdrop(xl5; start_index=14)
-    xl7 = layer_fcdrop(xl6, start_index=15)
-
-    ##Embedding layer for image representation
+    if train
+        xl6 = layer_fcdrop(xl5; start_index=14)
+        xl7 = layer_fcdrop(xl6, start_index=15)              
+    else
+        xl6 = layer_fconv(xl5; start_index=14)
+        xl7 = layer_fconv(xl6; start_index=15)
+    end    
     return xl7
     #return wdot(xl7; out=output)
 
     # return wbf(xl7; f=:soft, out=output)
 end
 
-@knet function top_layer(x; output=512)
-    return wdot(x; output=output)
+@knet function top_layer(x;output=512)
+    return wdot(x; out=output)
 end
 
 f = compile(:vgg16)
-forw(f, rand(Float32,224, 224, 3, 5))
+x = forw(f, rand(Float32,256, 320, 3, 5))
+
+#ft = compile(:test)
+#forw(ft, x)
+#f2 = compile(:top_layer)
+#forw(f2, x)
+
+#@knet function test(x;out=100)    
+ #   return wdot(x; out=100)
+#end
+
+
