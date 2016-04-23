@@ -4,7 +4,7 @@
 using Knet
 
 include("weigth_initializer.jl")
-ws, bs = get_weights()
+ws, bs = get_weights(weight_type=Float32)
 
 #bs[1] = reshape(bs[1], (1,1,64,1))
 #ws = reshape(ws, (length(ws),1))
@@ -50,13 +50,13 @@ end
 #    return drop(x1; pdrop=0.5)
 #end
 
+#Full convolutional layer
 @knet function layer_fconv(x; winit=ws,binit=bs, start_index=14)
     w = par(init=winit[start_index], dims=size(ws[start_index]))
-    b = par(init=binit[start_index], dims=size(bs[start_index]))
-    
+    b = par(init=binit[start_index], dims=size(bs[start_index]))    
     x1 = conv(w, x)
     x2 = x1 + b
-    return x2
+    return relu(x2)
 end
 
               
@@ -76,19 +76,34 @@ end
     else
         xl6 = layer_fconv(xl5; start_index=14)
         xl7 = layer_fconv(xl6; start_index=15)
-    end    
+    end
+    
     return xl7
     #return wdot(xl7; out=output)
 
     # return wbf(xl7; f=:soft, out=output)
 end
 
-@knet function top_layer(x;output=512)
+@knet function top_layer(x;output=512)    
     return wdot(x; out=output)
 end
 
-f = compile(:vgg16)
-x = forw(f, rand(Float32,256, 320, 3, 5))
+function encode(cnn, I; ptype=Float32)
+    x = convert(Array{ptype, 4}, forw(cnn, I))    
+    return reshape(mean(x, (1,2)), (size(x,3), size(x,4)))  #return the mean of pooling layers
+end
+
+
+debug = false
+if debug
+    f = compile(:vgg16)
+    x = encode(f, rand(Float32, 256, 270, 3, 5))
+    
+    ft = compile(:top_layer)
+    y = forw(ft, x)
+end
+
+#x = forw(f, rand(Float32,256, 270, 3, 5))
 
 #ft = compile(:test)
 #forw(ft, x)
