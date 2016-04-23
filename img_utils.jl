@@ -9,7 +9,7 @@ function img2vec(img; crop=true, crop_target=224, rescale = false, minmin_scale=
             y_start = rand(1:size(img,2)-crop_target+1)
             img = subim(img, "x", x_start:x_start+crop_target-1, "y", y_start:y_start+crop_target-1)
         end    
-        flip && rand(1:20)==1 && flipdim(img, 1)
+        flip && rand(1:20)==1 && flipdim(img, 2)
     end
     
     r = convert(Array{Float32, 3}, raw(img'))
@@ -24,6 +24,11 @@ end
 function mean_subtract(img)
     return img .- mean(img)
 end
+
+function flip_img(img)
+    return flipdim(img,2)
+end
+
 
 #Random rescaling system that applies isomorphic rescaling
 function random_rescale(img; srange=256:512)
