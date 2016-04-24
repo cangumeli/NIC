@@ -71,7 +71,7 @@ function create_dict(caption_texts; min_freq=5)
 end
 
 function dictasarray(dict)
-    dict_array = zeros(length(dict), 1)
+    dict_array = repmat([""], length(dict))    
     for k in keys(dict)
         dict_array[dict[k]] = k
     end
@@ -80,7 +80,7 @@ end
 
 function word2onehot(words, dict)
     ohv = zeros(Float32, length(dict), length(words))
-    for i = 1:lentgh(words)
+    for i = 1:length(words)
         ohv[dict[words[i]], i] = 1.0
     end    
     #vect = Array(1:length(dict))
@@ -98,28 +98,9 @@ function largest_caption(caption_texts, dict)
 end
 
 
-#Load the image files and corresponding caption texts as a vector,
-#applies mean subtraction while loading as it is a standard preprocession operation by default
-#but this can be changed with mean_sub parameter
-#Requires img_dists and caption_texts to be same size
-function img_seq_pairs(img_dsts, caption_texts, dict; max_caption=39, mean_sub=true, img_cache=nothing)
+
+function get_sequences(caption_texts, dict; max_caption=39)
     batch_size = length(caption_texts)
-    
-    #load the images
-    imgs = zeros(Float32, 224, 224, 3, batch_size)
-    for i = 1:batch_size
-        if img_cache != nothing && haskey(img_cache, img_dsts[i])
-            imgs[:, :, :, i] = img_cache[img_dsts[i]]
-        else
-            imgs[:, :, :, i] = mean_sub ? mean_subtract(img2vec(load(img_dsts[i]))) : img2vec(load(img_dsts[i]))
-            
-            if img_cache != nothing
-                img_cache[img_dsts[i]] = img
-            end
-        end                
-    end
-    
-    #load the captions
     caps = zeros(Float32, length(dict), max_caption, batch_size)
     masks = ones(UInt8, batch_size, max_caption)
     for b = 1:batch_size
@@ -130,9 +111,87 @@ function img_seq_pairs(img_dsts, caption_texts, dict; max_caption=39, mean_sub=t
             caps[wi, i, b] = 1.0
         end
     end
-    
-    return imgs, caps, masks
+    return caps, masks    
 end
+
+function get_images(img_dsts)
+    imgs = Any[]
+    for i = 1:length(img_dsts)
+        push!(imgs, mean_subtract(img2vec(load(img_dsts[i]))))
+    end
+    return imgs
+end
+
+function get_images(img_dsts, img_mean; unisize=true, dtype=Float32, img_size=(224,224,3))
+    
+    if unisize
+        imgs = zeros(dtype, (img_size[1], img_size[2], img_size[3], length(img_dsts)))
+        for i = 1:length(img_dsts)
+            imgs[:, :, :, i] = img2vec(load(img_dsts[i])) .- img_mean
+        end
+        return imgs
+    else                    
+        imgs = Any[]
+        for i = 1:length(img_dsts)
+            push!(imgs, img2vec(load(img_dsts[i])) .- img_mean)
+        end
+        return imgs
+    end        
+end
+
+
+    #DEATH CODE
+
+    
+#Load the image files and corresponding caption texts as a vector,
+#applies mean subtraction while loading as it is a standard preprocession operation by default
+#but this can be changed with mean_sub parameter
+#Requires img_dists and caption_texts to be same size
+function img_seq_pairs(img_dsts, caption_texts, dict; max_caption=39, mean_sub=true, img_cache=nothing, img_only = false, seq_only=false)
+
+    img_only && seq_only && error("Assertion failed: At least one of seq_only and img_only should be false")
+    #(length(caption_texts)!=length(img_dsts)) && error("Assertion failed: Different image and caption number.")
+    batch_size = img_only ? length(img_dsts) : length(caption_texts)
+    #load the images
+    if !seq_only
+        imgs = Any[]
+        for i = 1:batch_size
+            if img_cache != nothing && haskey(img_cache, img_dsts[i])
+                imgs[:, :, :, i] = img_cache[img_dsts[i]]
+            else
+                imgs[:, :, :, i] = mean_sub ? mean_subtract(img2vec(load(img_dsts[i]))) : img2vec(load(img_dsts[i]))
+            
+                if img_cache != nothing
+                    img_cache[img_dsts[i]] = imgs[:, :, :, i]
+                end
+            end                
+        end
+    end
+    
+    #load the captions
+    if !img_only
+        caps = zeros(Float32, length(dict), max_caption, batch_size)
+        masks = ones(UInt8, batch_size, max_caption)
+        for b = 1:batch_size
+            words = filter((w)->haskey(dict, w), split(caption_texts[b]))
+            for i = 1:max_caption
+                masks[b, i] = i <= length(words)
+                wi = (masks[b,i] == 1) ? dict[words[i]] : dict["<ew>"]
+                caps[wi, i, b] = 1.0
+            end
+        end
+    end
+    
+    if seq_only
+        return caps, masks
+    elseif img_only
+        return imgs
+    else        
+        return imgs, caps, masks
+    end
+    
+end
+
 
 
 

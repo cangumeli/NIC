@@ -4,7 +4,10 @@
 using Knet
 
 include("weigth_initializer.jl")
+include("img_utils.jl")
+
 ws, bs = get_weights(weight_type=Float32)
+
 
 #bs[1] = reshape(bs[1], (1,1,64,1))
 #ws = reshape(ws, (length(ws),1))
@@ -39,6 +42,8 @@ end
              binit=binits[start_index]
              )
 #    w = par(init=winits[start_index], dims=size(winits[start_index]))
+
+
     #x1 = w * x0
     return drop(x1; pdrop=0.5)
 end
@@ -72,13 +77,18 @@ end
     #Fully Connected layers
     if train
         xl6 = layer_fcdrop(xl5; start_index=14)
-        xl7 = layer_fcdrop(xl6, start_index=15)              
+        xl7 = layer_fcdrop(xl6; start_index=15)
+        #return soft_layer(xl7; start_index=16)        
     else
         xl6 = layer_fconv(xl5; start_index=14)
-        xl7 = layer_fconv(xl6; start_index=15)
+        xl7 = layer_fconv(xl6; start_index=15)                
     end
-    
-    return xl7
+
+    if genout
+        return soft_layer(xl7; start_index=16)
+    else
+        return xl7
+    end
     #return wdot(xl7; out=output)
 
     # return wbf(xl7; f=:soft, out=output)
@@ -88,22 +98,37 @@ end
     return wdot(x; out=output)
 end
 
-function encode(cnn, I; ptype=Float32)
-    x = convert(Array{ptype, 4}, forw(cnn, I))    
-    return reshape(mean(x, (1,2)), (size(x,3), size(x,4)))  #return the mean of pooling layers
+@knet function soft_layer(x; output=1000, winit=ws, binit=bs, start_index=16)
+    w = par(init=winit[start_index], dims=size(ws[start_index]))
+    b = par(init=binit[start_index], dims=size(bs[start_index]))
+    x1 = conv(w, x)
+    x2 = x1 + b
+    return soft(x2)
+    #return wbf(x; winit=winits[start_index], binit=binits[start_index], f=:soft, out=output)
+end
+
+function encode(cnn, I; ptype=Float32, flip=false)
+    x = convert(Array{ptype, 4}, forw(cnn, I))
+    xout = reshape(mean(x, (1,2)), (size(x,3), size(x,4)))  #return the mean of pooling layers
+
+    #Mean with the flipped image
+    if flip
+        xoutf = encode(cnn, flip_img(I); ptype=ptype, flip=false)
+        return (xout + xoutf) ./ 2
+    end
+    return xout      
 end
 
 
 debug = false
 if debug
     f = compile(:vgg16)
-    x = encode(f, rand(Float32, 256, 270, 3, 5))
-    
+    @time x = encode(f, rand(Float32, 256, 500, 3, 1))    
     ft = compile(:top_layer)
     y = forw(ft, x)
 end
 
-#x = forw(f, rand(Float32,256, 270, 3, 5))
+#@time x = forw(f, rand(Float32,256, 270, 3, 1))
 
 #ft = compile(:test)
 #forw(ft, x)
